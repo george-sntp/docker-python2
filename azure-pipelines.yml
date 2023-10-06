@@ -1,0 +1,58 @@
+# Docker
+# Build a Docker image
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- main
+
+resources:
+- repo: self
+
+# variables:
+#   tag: '$(Build.Repository.Name):$(Build.BuildId)'
+
+stages:
+- stage: Build
+  displayName: Build image
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: JavaToolInstaller@0
+      inputs:
+        versionSpec: '8'
+        jdkArchitectureOption: 'x64'
+        jdkSourceOption: 'PreInstalled'
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'docker-a'
+        command: 'login'
+        addPipelineData: false
+        addBaseImageData: false
+    
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'docker-a'
+        repository: 'docker-python-3.11'
+        command: 'build'
+        Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+        addPipelineData: false
+        addBaseImageData: false
+        tags: |
+          azuredevops
+
+    - task: CmdLine@2
+      inputs:
+        script: |
+          curl -L -f -o /tmp/nexus-iq-cli-latest.jar https://download.sonatype.com/clm/scanner/latest.jar
+          NEXUS_CONTAINER_SCANNING_MOUNT_PATH=$(Agent.TempDirectory) java -jar /tmp/nexus-iq-cli-latest.jar -i docker-python-3.11__phorton-sedocker-python-3.11 -a $(IQ_USER):$(IQ_PASSWORD) -s https://iq.phorton.eu.ngrok.io -t build container:docker-a.repo.phorton.eu.ngro.io/docker-python-3.11:azuredevops
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'docker-a'
+        repository: 'docker-python-3.11'
+        command: 'build'
+        Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+        tags: |
+          azuredevops
